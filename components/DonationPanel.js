@@ -1,20 +1,45 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { parseEther } from '@/lib/contract';
+import { formatEther } from '@/lib/contract';
 
 export default function DonationPanel({ tokenId, contract, signer, onSuccess }) {
-  const [amount, setAmount] = useState('');
+  const [requiredETH, setRequiredETH] = useState('0');
+  const [requiredUSD, setRequiredUSD] = useState('0');
   const [status, setStatus] = useState('idle');
   const [txHash, setTxHash] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRequiredAmount = async () => {
+      if (!contract) return;
+      
+      try {
+        setLoading(true);
+        // Get required ETH from contract
+        const requiredWei = await contract.viewRequiredETH();
+        setRequiredETH(formatEther(requiredWei));
+        
+        // Get USD amount (in cents)
+        const usdCents = await contract.donationAmountUSD();
+        setRequiredUSD((Number(usdCents) / 100).toFixed(2));
+        
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching required amount:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchRequiredAmount();
+    // Refresh every 30 seconds to get updated ETH price
+    const interval = setInterval(fetchRequiredAmount, 30000);
+    
+    return () => clearInterval(interval);
+  }, [contract]);
 
   const handleDonate = async () => {
-    if (!amount || parseFloat(amount) <= 0) {
-      alert('Please enter a valid amount');
-      return;
-    }
-
     if (!signer) {
       alert('Please connect your wallet');
       return;
@@ -23,8 +48,12 @@ export default function DonationPanel({ tokenId, contract, signer, onSuccess }) 
     try {
       setStatus('signing');
       const contractWithSigner = contract.connect(signer);
+      
+      // Get the latest required ETH amount
+      const requiredWei = await contract.viewRequiredETH();
+      
       const tx = await contractWithSigner.donate(tokenId, {
-        value: parseEther(amount)
+        value: requiredWei
       });
 
       setStatus('pending');
@@ -33,7 +62,6 @@ export default function DonationPanel({ tokenId, contract, signer, onSuccess }) 
       await tx.wait();
       setStatus('confirmed');
       setShowModal(true);
-      setAmount('');
       onSuccess?.();
 
       setTimeout(() => {
@@ -43,7 +71,7 @@ export default function DonationPanel({ tokenId, contract, signer, onSuccess }) 
     } catch (error) {
       console.error('Donation error:', error);
       setStatus('failed');
-      alert(error.reason || 'Transaction failed');
+      alert(error.reason || error.message || 'Transaction failed');
       setTimeout(() => setStatus('idle'), 3000);
     }
   };
@@ -62,27 +90,25 @@ export default function DonationPanel({ tokenId, contract, signer, onSuccess }) 
     <div className="bg-white/90 backdrop-blur-sm rounded-xl border border-gray-200 p-6 space-y-4 hover:shadow-lg transition-all">
       <h3 className="text-xl font-semibold text-gray-900">Make a Donation</h3>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Amount (ETH)
-        </label>
-        <input
-          type="number"
-          step="0.001"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.01"
-          disabled={status !== 'idle'}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:bg-gray-100 transition-all hover:border-emerald-300 min-h-[44px]"
-        />
+      <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-lg p-4 border border-emerald-200">
+        <div className="text-sm text-gray-600 mb-1">Fixed Donation Amount</div>
+        {loading ? (
+          <div className="text-2xl font-bold text-gray-400">Loading...</div>
+        ) : (
+          <>
+            <div className="text-3xl font-bold text-emerald-600">${requiredUSD} USD</div>
+            <div className="text-sm text-gray-500 mt-1">≈ {parseFloat(requiredETH).toFixed(6)} ETH</div>
+            <div className="text-xs text-gray-400 mt-2">Price updates every 30 seconds via Chainlink</div>
+          </>
+        )}
       </div>
 
       <button
         onClick={handleDonate}
-        disabled={!signer || status !== 'idle'}
+        disabled={!signer || status !== 'idle' || loading}
         className="w-full px-6 py-4 bg-emerald-600 text-white rounded-lg font-bold text-lg hover:bg-emerald-700 transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 min-h-[44px]"
       >
-        {status === 'idle' ? 'Donate Now' : getStatusMessage()}
+        {status === 'idle' ? `Donate $${requiredUSD}` : getStatusMessage()}
       </button>
 
       {txHash && (
@@ -108,7 +134,7 @@ export default function DonationPanel({ tokenId, contract, signer, onSuccess }) 
             <div className="bg-white rounded-2xl p-8 max-w-md text-center">
               <div className="text-6xl mb-4">🎉</div>
               <h3 className="text-2xl font-bold text-gray-800 mb-2">Thank You!</h3>
-              <p className="text-gray-600">Your donation has been received successfully</p>
+              <p className="text-gray-600">Your ${requiredUSD} donation has been received successfully</p>
             </div>
           </motion.div>
         )}

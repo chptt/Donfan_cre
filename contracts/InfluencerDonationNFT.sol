@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC721/ERC721.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/security/ReentrancyGuard.sol";
 
 // -------- Chainlink Integration Start --------
 // AggregatorV3Interface - Chainlink Price Feed Interface
@@ -132,7 +132,7 @@ contract InfluencerDonationNFT is ERC721, ReentrancyGuard {
         return influencers[tokenId].totalDonations;
     }
     
-    function _exists(uint256 tokenId) internal view returns (bool) {
+    function _exists(uint256 tokenId) internal view override returns (bool) {
         return tokenId < _tokenIdCounter;
     }
     
