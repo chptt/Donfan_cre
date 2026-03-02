@@ -74,7 +74,7 @@ contract InfluencerDonationNFT is ERC721, ReentrancyGuard {
         require(bytes(_influencerName).length <= 50, "Name too long");
         
         uint256 tokenId = _tokenIdCounter++;
-        _safeMint(msg.sender, tokenId);
+        _mint(msg.sender, tokenId);
         
         influencers[tokenId] = InfluencerData({
             charity: _charity,

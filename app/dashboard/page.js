@@ -69,7 +69,8 @@ export default function Dashboard() {
         return;
       }
 
-      const tokenId = campaignIds[0];
+      // Get the LATEST campaign (last one created)
+      const tokenId = campaignIds[campaignIds.length - 1];
       
       const influencer = await contract.influencers(tokenId);
       const owner = await contract.ownerOf(tokenId);
